@@ -1,7 +1,15 @@
 ## Golang Password Generator
 
-[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://pkg.go.dev/github.com/sethvargo/go-password/password)
-[![GitHub Actions](https://img.shields.io/github/workflow/status/sethvargo/go-password/Test?style=flat-square)](https://github.com/sethvargo/go-password/actions?query=workflow%3ATest)
+[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://pkg.go.dev/github.com/juev/go-password/password)
+[![Test](https://github.com/juev/go-password/actions/workflows/test.yml/badge.svg)](https://github.com/juev/go-password/actions/workflows/test.yml)
+
+<hr>
+
+This is a fork of the [sethvargo/go-password](https://github.com/sethvargo/go-password) repository, which has made 
+changes that, in my  opinion, make the library safer and easier to  use. But since the main developer did not accept 
+these changes, so as  not to break the established API, I created this fork.
+
+<hr>
 
 This library implements generation of random passwords with provided
 requirements as described by  [AgileBits
@@ -26,7 +34,7 @@ wpvbxlsc
 ## Installation
 
 ```sh
-$ go get -u github.com/sethvargo/go-password/password
+$ go get -u github.com/juev/go-password/password
 ```
 
 ## Usage
@@ -37,13 +45,17 @@ package main
 import (
   "log"
 
-  "github.com/sethvargo/go-password/password"
+  "github.com/juev/go-password/password"
 )
 
 func main() {
   // Generate a password that is 64 characters long with 10 digits, 10 symbols,
   // allowing upper and lower case letters, disallowing repeat characters.
-  res, err := password.Generate(64, 10, 10, false, false)
+  res, err := password.Generate(password.Input{
+	  Length:  64,
+	  Digits:  10,
+	  Symbols: 10,
+  })
   if err != nil {
     log.Fatal(err)
   }
@@ -51,32 +63,8 @@ func main() {
 }
 ```
 
-See the [GoDoc](https://godoc.org/github.com/sethvargo/go-password) for more
+See the [GoDoc](https://godoc.org/github.com/juev/go-password) for more
 information.
-
-## Testing
-
-For testing purposes, instead of accepted a `*password.Generator` struct, accept
-a `password.PasswordGenerator` interface:
-
-```go
-// func MyFunc(p *password.Generator)
-func MyFunc(p password.PasswordGenerator) {
-  // ...
-}
-```
-
-Then, in tests, use a mocked password generator with stubbed data:
-
-```go
-func TestMyFunc(t *testing.T) {
-  gen := password.NewMockGenerator("canned-response", false)
-  MyFunc(gen)
-}
-```
-
-In this example, the mock generator will always return the value
-"canned-response", regardless of the provided parameters.
 
 ## License
 
