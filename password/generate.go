@@ -14,21 +14,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"strings"
 )
-
-// Built-time checks that the generators implement the interface.
-var _ PasswordGenerator = (*Generator)(nil)
-
-// PasswordGenerator is an interface that implements the Generate function. This
-// is useful for testing where you can pass this interface instead of a real
-// password generator to mock responses for predicability.
-type PasswordGenerator interface {
-	Generate(int, int, int, bool, bool) (string, error)
-	MustGenerate(int, int, int, bool, bool) string
-}
 
 const (
 	// LowerLetters is the list of lowercase letters.
@@ -69,55 +57,56 @@ type Generator struct {
 	upperLetters string
 	digits       string
 	symbols      string
-	reader       io.Reader
 }
 
-// GeneratorInput is used as input to the NewGenerator function.
-type GeneratorInput struct {
-	LowerLetters string
-	UpperLetters string
-	Digits       string
-	Symbols      string
-	Reader       io.Reader // rand.Reader by default
+// Input used to define input parameters for the generator.
+type Input struct {
+	Length      int
+	Digits      int
+	Symbols     int
+	NoUpper     bool
+	AllowRepeat bool
+	_           struct{}
 }
 
 // NewGenerator creates a new Generator from the specified configuration. If no
 // input is given, all the default values are used. This function is safe for
 // concurrent use.
-func NewGenerator(i *GeneratorInput) (*Generator, error) {
-	if i == nil {
-		i = new(GeneratorInput)
+func NewGenerator() Generator {
+	return Generator{
+		lowerLetters: LowerLetters,
+		upperLetters: UpperLetters,
+		digits:       Digits,
+		symbols:      Symbols,
 	}
+}
 
-	g := &Generator{
-		lowerLetters: i.LowerLetters,
-		upperLetters: i.UpperLetters,
-		digits:       i.Digits,
-		symbols:      i.Symbols,
-		reader:       i.Reader,
-	}
+// WithLowerLetters creates a new Generator from another Generator with specific
+// LowerLetters.
+func (g Generator) WithLowerLetters(lowerLetters string) Generator {
+	g.lowerLetters = lowerLetters
+	return g
+}
 
-	if g.lowerLetters == "" {
-		g.lowerLetters = LowerLetters
-	}
+// WithUpperLetters creates a new Generator from another Generator with specific
+// UpperLetters.
+func (g Generator) WithUpperLetters(upperLetters string) Generator {
+	g.upperLetters = upperLetters
+	return g
+}
 
-	if g.upperLetters == "" {
-		g.upperLetters = UpperLetters
-	}
+// WithDigits creates a new Generator from another Generator with specific
+// Digits.
+func (g Generator) WithDigits(digits string) Generator {
+	g.digits = digits
+	return g
+}
 
-	if g.digits == "" {
-		g.digits = Digits
-	}
-
-	if g.symbols == "" {
-		g.symbols = Symbols
-	}
-
-	if g.reader == nil {
-		g.reader = rand.Reader
-	}
-
-	return g, nil
+// WithSymbols creates a new Generator from another Generator with specific
+// Symbols.
+func (g Generator) WithSymbols(symbols string) Generator {
+	g.symbols = symbols
+	return g
 }
 
 // Generate generates a password with the given requirements. length is the
@@ -128,26 +117,26 @@ func NewGenerator(i *GeneratorInput) (*Generator, error) {
 //
 // The algorithm is fast, but it's not designed to be performant; it favors
 // entropy over speed. This function is safe for concurrent use.
-func (g *Generator) Generate(length, numDigits, numSymbols int, noUpper, allowRepeat bool) (string, error) {
+func (g Generator) Generate(input Input) (string, error) {
 	letters := g.lowerLetters
-	if !noUpper {
+	if !input.NoUpper {
 		letters += g.upperLetters
 	}
 
-	chars := length - numDigits - numSymbols
+	chars := input.Length - input.Digits - input.Symbols
 	if chars < 0 {
 		return "", ErrExceedsTotalLength
 	}
 
-	if !allowRepeat && chars > len(letters) {
+	if !input.AllowRepeat && chars > len(letters) {
 		return "", ErrLettersExceedsAvailable
 	}
 
-	if !allowRepeat && numDigits > len(g.digits) {
+	if !input.AllowRepeat && input.Digits > len(g.digits) {
 		return "", ErrDigitsExceedsAvailable
 	}
 
-	if !allowRepeat && numSymbols > len(g.symbols) {
+	if !input.AllowRepeat && input.Symbols > len(g.symbols) {
 		return "", ErrSymbolsExceedsAvailable
 	}
 
@@ -155,53 +144,53 @@ func (g *Generator) Generate(length, numDigits, numSymbols int, noUpper, allowRe
 
 	// Characters
 	for i := 0; i < chars; i++ {
-		ch, err := randomElement(g.reader, letters)
+		ch, err := randomElement(letters)
 		if err != nil {
 			return "", err
 		}
 
-		if !allowRepeat && strings.Contains(result, ch) {
+		if !input.AllowRepeat && strings.Contains(result, ch) {
 			i--
 			continue
 		}
 
-		result, err = randomInsert(g.reader, result, ch)
+		result, err = randomInsert(result, ch)
 		if err != nil {
 			return "", err
 		}
 	}
 
 	// Digits
-	for i := 0; i < numDigits; i++ {
-		d, err := randomElement(g.reader, g.digits)
+	for i := 0; i < input.Digits; i++ {
+		d, err := randomElement(g.digits)
 		if err != nil {
 			return "", err
 		}
 
-		if !allowRepeat && strings.Contains(result, d) {
+		if !input.AllowRepeat && strings.Contains(result, d) {
 			i--
 			continue
 		}
 
-		result, err = randomInsert(g.reader, result, d)
+		result, err = randomInsert(result, d)
 		if err != nil {
 			return "", err
 		}
 	}
 
 	// Symbols
-	for i := 0; i < numSymbols; i++ {
-		sym, err := randomElement(g.reader, g.symbols)
+	for i := 0; i < input.Symbols; i++ {
+		sym, err := randomElement(g.symbols)
 		if err != nil {
 			return "", err
 		}
 
-		if !allowRepeat && strings.Contains(result, sym) {
+		if !input.AllowRepeat && strings.Contains(result, sym) {
 			i--
 			continue
 		}
 
-		result, err = randomInsert(g.reader, result, sym)
+		result, err = randomInsert(result, sym)
 		if err != nil {
 			return "", err
 		}
@@ -211,8 +200,8 @@ func (g *Generator) Generate(length, numDigits, numSymbols int, noUpper, allowRe
 }
 
 // MustGenerate is the same as Generate, but panics on error.
-func (g *Generator) MustGenerate(length, numDigits, numSymbols int, noUpper, allowRepeat bool) string {
-	res, err := g.Generate(length, numDigits, numSymbols, noUpper, allowRepeat)
+func (g Generator) MustGenerate(input Input) string {
+	res, err := g.Generate(input)
 	if err != nil {
 		panic(err)
 	}
@@ -220,18 +209,13 @@ func (g *Generator) MustGenerate(length, numDigits, numSymbols int, noUpper, all
 }
 
 // Generate is the package shortcut for Generator.Generate.
-func Generate(length, numDigits, numSymbols int, noUpper, allowRepeat bool) (string, error) {
-	gen, err := NewGenerator(nil)
-	if err != nil {
-		return "", err
-	}
-
-	return gen.Generate(length, numDigits, numSymbols, noUpper, allowRepeat)
+func Generate(input Input) (string, error) {
+	return NewGenerator().Generate(input)
 }
 
 // MustGenerate is the package shortcut for Generator.MustGenerate.
-func MustGenerate(length, numDigits, numSymbols int, noUpper, allowRepeat bool) string {
-	res, err := Generate(length, numDigits, numSymbols, noUpper, allowRepeat)
+func MustGenerate(input Input) string {
+	res, err := Generate(input)
 	if err != nil {
 		panic(err)
 	}
@@ -239,12 +223,12 @@ func MustGenerate(length, numDigits, numSymbols int, noUpper, allowRepeat bool) 
 }
 
 // randomInsert randomly inserts the given value into the given string.
-func randomInsert(reader io.Reader, s, val string) (string, error) {
+func randomInsert(s, val string) (string, error) {
 	if s == "" {
 		return val, nil
 	}
 
-	n, err := rand.Int(reader, big.NewInt(int64(len(s)+1)))
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(s)+1)))
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random integer: %w", err)
 	}
@@ -253,8 +237,8 @@ func randomInsert(reader io.Reader, s, val string) (string, error) {
 }
 
 // randomElement extracts a random element from the given string.
-func randomElement(reader io.Reader, s string) (string, error) {
-	n, err := rand.Int(reader, big.NewInt(int64(len(s))))
+func randomElement(s string) (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(s))))
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random integer: %w", err)
 	}
