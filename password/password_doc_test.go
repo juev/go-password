@@ -3,7 +3,7 @@ package password_test
 import (
 	"log"
 
-	"github.com/sethvargo/go-password/password"
+	"github.com/juev/go-password/password"
 )
 
 func ExampleGenerate() {

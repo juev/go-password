@@ -1,4 +1,4 @@
-module github.com/sethvargo/go-password
+module github.com/juev/go-password
 
 toolchain go1.21.11
 
