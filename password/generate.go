@@ -59,7 +59,7 @@ type Generator struct {
 	symbols      string
 }
 
-// Input used to define input parameters for the generator
+// Input used to define input parameters for the generator.
 type Input struct {
 	Length      int
 	Digits      int
@@ -82,28 +82,28 @@ func NewGenerator() Generator {
 }
 
 // WithLowerLetters creates a new Generator from another Generator with specific
-// LowerLetters
+// LowerLetters.
 func (g Generator) WithLowerLetters(lowerLetters string) Generator {
 	g.lowerLetters = lowerLetters
 	return g
 }
 
 // WithUpperLetters creates a new Generator from another Generator with specific
-// UpperLetters
+// UpperLetters.
 func (g Generator) WithUpperLetters(upperLetters string) Generator {
 	g.upperLetters = upperLetters
 	return g
 }
 
 // WithDigits creates a new Generator from another Generator with specific
-// Digits
+// Digits.
 func (g Generator) WithDigits(digits string) Generator {
 	g.digits = digits
 	return g
 }
 
 // WithSymbols creates a new Generator from another Generator with specific
-// Symbols
+// Symbols.
 func (g Generator) WithSymbols(symbols string) Generator {
 	g.symbols = symbols
 	return g
